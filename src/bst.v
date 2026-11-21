@@ -289,17 +289,27 @@ Proof.
   - simpl.
     bdestruct (k <? x).
     + apply BST_T.
-      * apply ForallT_insert; [exact Hlt | exact H].
+      * apply ForallT_insert.
+        -- exact Hlt.
+        -- exact H.
       * exact Hgt.
       * apply IHl.
       * exact Hr.
     + bdestruct (k >? x).
       * apply BST_T.
         -- exact Hlt.
-        -- apply ForallT_insert; [exact Hgt | exact H0].
+        -- apply ForallT_insert.
+           ++ exact Hgt.
+           ++ exact H0.
         -- exact Hl.
         -- apply IHr.
-      * apply BST_T; assumption.
+      * assert (Heq : k = x) by lia.
+        rewrite Heq.
+        apply BST_T.
+        -- exact Hlt.
+        -- exact Hgt.
+        -- exact Hl.
+        -- exact Hr.
 Qed.
 
 (** ** A correção das funções de busca [lookup] e [bound] *)
@@ -357,23 +367,7 @@ Theorem lookup_insert_neq :
   forall (V : Type) (t : tree V) (d : V) (k k' : key) (v : V),
    k <> k' -> lookup d k' (insert k v t) = lookup d k' t.
 Proof.
-  induction t as [| l IHl y v' r IHr]; intros d k k' v Hneq.
-  - simpl.
-    bdestruct (k' <? k); [reflexivity |].
-    bdestruct (k' >? k); [reflexivity | lia].
-  - simpl.
-    bdestruct (k <? y); bdestruct (k' <? y); simpl.
-    + bdestruct (k' <? y); [apply IHl; exact Hneq | lia].
-    + bdestruct (k' <? y); [lia |].
-      bdestruct (k' >? y); [reflexivity | reflexivity].
-    + bdestruct (k >? y); simpl.
-      * bdestruct (k' <? y); [reflexivity | lia].
-      * bdestruct (k' <? y); [reflexivity | lia].
-    + bdestruct (k >? y); simpl.
-      * bdestruct (k' <? y); [lia |].
-        bdestruct (k' >? y); [apply IHr; exact Hneq | lia].
-      * bdestruct (k' <? y); [lia |].
-        bdestruct (k' >? y); [reflexivity | lia].
+  induction t; intros; bdall.
 Qed.
 
 (** *** Questão 5 *)
@@ -486,20 +480,21 @@ Proof.
     simpl in Hforall.
     destruct Hforall as [Hpv [_ Hpr]].
     split; [exact Hpv | exact Hpr].
-  - simpl in Hforall.
-    destruct Hforall as [Hpv [[Hplk [Hpll Hplr]] Hpr]].
-    simpl in Hrm.
+  - simpl in Hrm.
     destruct (remove_min ll lk lv lr) as [[m0 w0] l'] eqn:Hrec.
     inversion Hrm; subst.
-    assert (Hforall_sub : ForallT P (T ll lk lv lr)).
+    simpl in Hforall.
+    destruct Hforall as [Hpv [[Hplk [Hpll Hplr]] Hpr]].
+    assert (Hrec_res : P m w /\ ForallT P l').
     {
-      simpl.
-      split; [exact Hplk | split; [exact Hpll | exact Hplr]].
+      eapply IHl.
+      - simpl. split; [exact Hplk | split; [exact Hpll | exact Hplr]].
+      - exact Hrec.
     }
-    destruct (IHl lr l' lk m lv w0 Hforall_sub Hrec) as [Hpm Hpl'].
-    split; [exact Hpm |].
-    simpl.
-    split; [exact Hpv | split; [exact Hpl' | exact Hpr]].
+    destruct Hrec_res as [Hpm Hl'].
+    split.
+    + exact Hpm.
+    + simpl. split; [exact Hpv | split; [exact Hl' | exact Hpr]].
 Qed.
 
 (** *** Questão 7 *)
@@ -517,16 +512,24 @@ Proof.
   induction l as [| ll IHl lk lv lr _]; intros r t' k m v w Hbst Hrm.
   - simpl in Hrm.
     inversion Hrm; subst.
-    inv Hbst.
+    inversion Hbst; subst.
     split; [assumption | assumption].
   - simpl in Hrm.
     destruct (remove_min ll lk lv lr) as [[m0 w0] l'] eqn:Hrec.
     inversion Hrm; subst.
-    inv Hbst.
-    destruct (IHl lr l' lk m lv w0 H3 Hrec) as [Hbst_l' Hgt_l'].
+    inversion Hbst as [| l_orig x_orig v_orig r_orig Hlt_orig Hgt_orig Hll_bst Hr_bst]; subst.
+    assert (Hrec_bst : BST l' /\ ForallT (fun y _ => y > m) l').
+    {
+      eapply IHl.
+      - exact Hll_bst.
+      - exact Hrec.
+    }
+    destruct Hrec_bst as [Hbst_l' Hgt_l'].
     assert (Hrm_prop : (m < k) /\ ForallT (fun y _ => y < k) l').
     {
-      apply (ForallT_remove_min V (fun y _ => y < k) ll lr l' lk m lv w0 H1 Hrec).
+      eapply (ForallT_remove_min _ (fun y _ => y < k)).
+      - exact Hlt_orig.
+      - exact Hrec.
     }
     destruct Hrm_prop as [Hmk Hlt_l'].
     split.
@@ -535,9 +538,8 @@ Proof.
       split; [lia |].
       split; [exact Hgt_l' |].
       apply (ForallT_impl V (fun y _ => y > k) (fun y _ => y > m) r).
-      * intros y vy Hy.
-        lia.
-      * exact H2.
+      * intros y vy Hy. lia.
+      * exact Hgt_orig.
 Qed.
 
 (** *** Questão 8 *)

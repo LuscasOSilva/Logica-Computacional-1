@@ -13,3 +13,5 @@ latex/*.log
 latex/*.out
 latex/*.toc
 latex/*.pdf
+_opam
+.vscode
